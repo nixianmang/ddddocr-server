@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>粘贴或选择图片</title>
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app" v-cloak>
+        <h2>粘贴或选择图片</h2>
+        <p>按 Ctrl + V 粘贴图片或选择图片，删除图片时点击红色按钮。</p>
+
+        <!-- 文件选择按钮 -->
+        <input type="file" id="fileInput" @change="handleFileChange" accept="image/*" multiple>
+
+        <div id="preview" v-if="files.length">
+            <div v-for="(item, index) in files">
+                <img :src="item.src" alt="图片" />
+                <p>{{ item.text }}</p>
+                <button class="delete-btn" @click="deleteImage(index)">删除</button>
+            </div>
+        </div>
+        <button class="upload-btn" @click="clear">清空</button>
+        <button class="upload-btn" @click="upload">上传图片</button>
+    </div>
+
+    <script src="https://cdn.bootcdn.net/ajax/libs/vue/3.5.13/vue.global.js"></script>
+    <script>
+        const { createApp } = Vue
+
+        const app = createApp({
+            data() {
+                return {
+                    files: []
+                }
+            },
+
+            mounted() {
+                // 粘贴事件处理
+                document.addEventListener('paste', (event) => {
+                    const items = event.clipboardData.items;
+                    for (const item of items) {
+                        if (item.kind !== 'file') {
+                            continue
+                        }
+                        const file = item.getAsFile()
+                        this.files.push({ file, src: URL.createObjectURL(file), text: '' });
+                    }
+                    console.log(this.files);
+
+                });
+            },
+            methods: {
+                handleFileChange(event) {
+                    const selectedFiles = event.target.files;
+                    for (const file of selectedFiles) {
+                        this.files.push({ file, src: URL.createObjectURL(file), text: '' });
+                    }
+                },
+                deleteImage(index) {
+                    this.files.splice(index, 1);
+                },
+                clear() {
+                    this.files = [];
+                },
+                async upload() {
+                    if (this.files.length === 0) {
+                        return;
+                    }
+                    const formData = new FormData();
+                    this.files.forEach((item, index) => {
+                        formData.append(`files`, item.file);
+                    });
+
+                    try {
+                        const response = await fetch('/ocrs', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const { data } = await response.json();
+
+                        console.log(data);
+                        this.files = this.files.map((file, index) => {
+                            return {
+                                ...file,
+                                text: data[index]
+                            }
+                        })
+
+
+                    } catch (error) {
+                        console.error('上传错误:', error);
+                    }
+                }
+            }
+
+        })
+
+        app.mount('#app')
+
+    </script>
+
+
+</body>
+
+</html>
